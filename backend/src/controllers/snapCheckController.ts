@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import { SnapCheckService } from '../services/snapCheckService.js';
 import { SnapCheckResult } from '../models/SnapCheckResult.js';
+import { eventBus } from '../services/eventEngine.js';
 
 export class SnapCheckController {
   public static async getHistory(req: AuthRequest, res: Response) {
@@ -26,6 +27,15 @@ export class SnapCheckController {
       const fileUrl = imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
       const snapResult = await SnapCheckService.analyzeMealImage(userId, fileUrl);
+
+      // Emit SNAP_CHECK_COMPLETED Event
+      eventBus.emit('SNAP_CHECK_COMPLETED', {
+        userId: userId.toString(),
+        foodName: snapResult.detectedItems?.[0]?.foodName || 'Regional Meal',
+        calories: snapResult.estimatedNutrition?.calories || 350,
+        proteinG: snapResult.estimatedNutrition?.proteinG || 18,
+      });
+
       return res.status(201).json({
         success: true,
         message: 'Meal image analyzed successfully',

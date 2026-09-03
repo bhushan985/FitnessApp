@@ -69,12 +69,13 @@ export class TrainerController {
 
       await assignment.save();
 
-      await NotificationService.sendNotification(
+      await NotificationService.send({
         userId,
-        'Personal Trainer Assigned!',
-        `Coach ${trainer.name} has been assigned as your personal trainer.`,
-        'trainer'
-      );
+        title: 'Personal Trainer Assigned!',
+        message: `Coach ${trainer.name} has been assigned as your personal trainer.`,
+        type: 'system',
+        category: 'trainer',
+      });
 
       res.json({ success: true, message: 'Trainer assigned successfully', data: assignment });
     } catch (error: any) {

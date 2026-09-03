@@ -7,11 +7,14 @@ const router = Router();
 router.use(authenticateJWT);
 
 router.get('/today', WorkoutController.getTodayWorkout);
+router.get('/routine', WorkoutController.getRoutine);
 router.post('/generate', WorkoutController.generateWorkout);
 router.post('/generate-abs', WorkoutController.generateAbsWorkout);
 router.post('/ai-parse', WorkoutController.parseAIWorkout);
 router.post('/complete', WorkoutController.completeWorkout);
 router.put('/customize/:workoutPlanId', WorkoutController.customizeWorkout);
+router.post('/activity', WorkoutController.logActivity);
+router.get('/history', WorkoutController.getWorkoutHistory);
 
 // Templates & Progress
 router.get('/templates', WorkoutController.getTemplates);
@@ -19,3 +22,4 @@ router.post('/templates', WorkoutController.saveTemplate);
 router.get('/progress/:exerciseName', WorkoutController.getExerciseProgressHistory);
 
 export default router;
+

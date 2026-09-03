@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Flame, Dumbbell, Zap, CheckCircle2, ChevronRight, MapPin, RefreshCw, PlusCircle, Camera, RotateCcw, Compass, Navigation, Heart, Footprints, Moon, Activity, ArrowRightLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Flame, Dumbbell, Zap, CheckCircle2, ChevronRight, MapPin, RefreshCw, PlusCircle, Camera, RotateCcw, Compass, Navigation, Heart, Footprints, Moon, Activity, ArrowRightLeft, Bell } from 'lucide-react';
 import { UserProfile, MealPlanItem, MealPlan, Region, User } from '../types';
 import { SnapCheckModal } from '../components/SnapCheckModal';
 import { LocationSettingsModal } from '../components/LocationSettingsModal';
@@ -7,8 +7,12 @@ import { RegionChangePromptModal } from '../components/RegionChangePromptModal';
 import { ModifyMealModal } from '../components/ModifyMealModal';
 import { WhatCanIEatModal } from '../components/WhatCanIEatModal';
 import { CookFromKitchenModal } from '../components/CookFromKitchenModal';
-import { healthApi } from '../services/api';
+import { NotificationCenterModal } from '../components/NotificationCenterModal';
+import { NotificationToast, ToastNotification } from '../components/NotificationToast';
+import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
+import { healthApi, notificationApi } from '../services/api';
 import { HealthService, HealthMetricData } from '../services/healthService';
+import { socketClient } from '../services/socketClient';
 
 interface Props {
   user?: User | null;
@@ -47,9 +51,58 @@ export const HomeScreen: React.FC<Props> = ({
   const [isEatNowOpen, setIsEatNowOpen] = useState<boolean>(false);
   const [isCookKitchenOpen, setIsCookKitchenOpen] = useState<boolean>(false);
 
-  React.useEffect(() => {
+  // Real-Time Notification System State
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [activeToast, setActiveToast] = useState<ToastNotification | null>(null);
+
+  useEffect(() => {
     loadTodayHealth();
-  }, []);
+    loadUnreadCount();
+
+    // Register Service Worker for FCM / Web Push background notifications
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((e) => console.log('SW register error:', e));
+    }
+
+    // Connect Socket.IO for real-time in-app alerts
+    const token = localStorage.getItem('token') || '';
+    const userId = user?.id || (user as any)?._id || '';
+    socketClient.connect(userId, token);
+
+    const unsubNew = socketClient.onNewNotification((notif) => {
+      setActiveToast({
+        id: notif.id || Date.now().toString(),
+        title: notif.title,
+        message: notif.message,
+        category: notif.category || notif.type,
+        soundType: notif.soundType || 'DEFAULT',
+        link: notif.link,
+      });
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    const unsubCount = socketClient.onUnreadCountChange((count) => {
+      setUnreadCount(count);
+    });
+
+    return () => {
+      unsubNew();
+      unsubCount();
+    };
+  }, [user]);
+
+  const loadUnreadCount = async () => {
+    try {
+      const res = await notificationApi.getUnreadCount();
+      if (res.success && typeof res.unreadCount === 'number') {
+        setUnreadCount(res.unreadCount);
+      }
+    } catch (e) {
+      // quiet catch
+    }
+  };
 
   const loadTodayHealth = async () => {
     try {
@@ -114,13 +167,28 @@ export const HomeScreen: React.FC<Props> = ({
             Hello, <span className="text-emerald-400">{user?.name ? user.name.split(' ')[0] : 'Member'}</span> 👋
           </h2>
         </div>
-        <button
-          onClick={onGenerateNewPlan}
-          className="bg-slate-800 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 p-2.5 rounded-2xl flex items-center space-x-1.5 text-xs font-bold transition-all shadow-md"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Regenerate</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsNotificationCenterOpen(true)}
+            className="relative bg-slate-800 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 p-2.5 rounded-2xl flex items-center justify-center transition-all shadow-md"
+            title="Notification Center"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-emerald-400 text-slate-950 text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-lg border border-slate-900 animate-pulse">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={onGenerateNewPlan}
+            className="bg-slate-800 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 p-2.5 rounded-2xl flex items-center space-x-1.5 text-xs font-bold transition-all shadow-md"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Regenerate</span>
+          </button>
+        </div>
       </div>
 
       {/* CORE PRODUCT QUICK ACTIONS */}
@@ -441,6 +509,38 @@ export const HomeScreen: React.FC<Props> = ({
         onKeepCurrentPlan={() => {
           setNewRegionPromptData(null);
         }}
+      />
+
+      {/* Real-Time Notification Toast */}
+      <NotificationToast
+        toast={activeToast}
+        onClose={() => setActiveToast(null)}
+        onNavigate={(link) => {
+          if (link.includes('workout')) onNavigateToTab('workouts');
+          else if (link.includes('meal')) onNavigateToTab('meals');
+          else if (link.includes('progress')) onNavigateToTab('progress');
+        }}
+      />
+
+      {/* Real-Time Notification Center Drawer */}
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        onOpenSettings={() => {
+          setIsNotificationCenterOpen(false);
+          setIsNotificationSettingsOpen(true);
+        }}
+        onNavigateDeepLink={(link) => {
+          if (link.includes('workout')) onNavigateToTab('workouts');
+          else if (link.includes('meal')) onNavigateToTab('meals');
+          else if (link.includes('progress')) onNavigateToTab('progress');
+        }}
+      />
+
+      {/* Notification Preferences Settings Modal */}
+      <NotificationSettingsModal
+        isOpen={isNotificationSettingsOpen}
+        onClose={() => setIsNotificationSettingsOpen(false)}
       />
     </div>
   );

@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dumbbell,
-  Search,
-  Filter,
-  Flame,
-  Clock,
-  Award,
-  Play,
-  CheckCircle2,
-  Sparkles,
-  Plus,
-  RefreshCw,
-  Info,
-  ChevronRight,
-  Zap,
-  Bookmark,
-  History,
-  ShieldCheck,
-} from 'lucide-react';
-import { workoutApi, exerciseApi } from '../services/api';
-import { WorkoutPlan } from '../types';
+import { Dumbbell, Sparkles, LayoutDashboard, Calendar, Search, Activity } from 'lucide-react';
+import { workoutApi } from '../services/api';
+import { WorkoutDashboard } from '../components/WorkoutDashboard';
+import { MyRoutineScreen } from '../components/MyRoutineScreen';
+import { WorkoutLibraryScreen } from '../components/WorkoutLibraryScreen';
+import { CategoryWorkoutListScreen } from '../components/CategoryWorkoutListScreen';
+import { WorkoutDetailsScreen } from '../components/WorkoutDetailsScreen';
+import { ActivityTrackerScreen } from '../components/ActivityTrackerScreen';
 import { CustomizeWorkoutModal } from '../components/CustomizeWorkoutModal';
 import { LiveWorkoutTrackerModal } from '../components/LiveWorkoutTrackerModal';
 import { ExerciseReplacementModal } from '../components/ExerciseReplacementModal';
@@ -31,22 +18,17 @@ interface Props {
 }
 
 export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
-  const [activeTab, setActiveTab] = useState<'today' | 'library' | 'abs' | 'templates'>('today');
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'routine' | 'library' | 'activity'>('dashboard');
 
-  // Today Workout State
+  // Selected Category / Workout Details View State
+  const [selectedCategoryTitle, setSelectedCategoryTitle] = useState<string | null>(null);
+  const [selectedWorkoutDetails, setSelectedWorkoutDetails] = useState<any | null>(null);
+
+  // Today Workout Plan State
   const [workoutPlan, setWorkoutPlan] = useState<any>(null);
   const [isCompletedToday, setIsCompletedToday] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-
-  // Exercise Library State
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedMuscle, setSelectedMuscle] = useState<string>('all');
-  const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
-  const [libraryExercises, setLibraryExercises] = useState<any[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState<boolean>(false);
-
-  // Templates State
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   // Modals state
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState<boolean>(false);
@@ -59,19 +41,12 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
 
   useEffect(() => {
     loadTodayWorkout();
-    loadTemplates();
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'library') {
-      loadLibraryExercises();
-    }
-  }, [activeTab, searchQuery, selectedMuscle, selectedEquipment]);
-
-  const loadTodayWorkout = async () => {
+  const loadTodayWorkout = async (day?: string) => {
     try {
       setLoading(true);
-      const res = await workoutApi.getTodayWorkout();
+      const res = await workoutApi.getTodayWorkout(day);
       if (res.success && res.data) {
         setWorkoutPlan(res.data.workoutPlan);
         setIsCompletedToday(res.data.isCompletedToday);
@@ -83,45 +58,19 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
     }
   };
 
-  const loadLibraryExercises = async () => {
-    try {
-      setLibraryLoading(true);
-      const res = await exerciseApi.searchExercises({
-        q: searchQuery || undefined,
-        muscle: selectedMuscle !== 'all' ? selectedMuscle : undefined,
-        equipment: selectedEquipment !== 'all' ? selectedEquipment : undefined,
-      });
-      if (res.success && res.data) {
-        setLibraryExercises(res.data);
-      }
-    } catch (err) {
-      console.error('Library search error:', err);
-    } finally {
-      setLibraryLoading(false);
-    }
-  };
-
-  const loadTemplates = async () => {
-    try {
-      const res = await workoutApi.getTemplates();
-      if (res.success && res.data) {
-        setTemplates(res.data);
-      }
-    } catch (err) {
-      console.error('Templates fetch error:', err);
-    }
-  };
-
-  const handleGenerateAbs = async (durationMin: number) => {
+  const handleSelectQuickStart = async (title: string, durationMin: number) => {
     try {
       setLoading(true);
-      const res = await workoutApi.generateAbsWorkout(durationMin);
+      const res = await workoutApi.generateWorkout({
+        goal: title.toLowerCase().includes('abs') ? 'fat_loss' : 'hypertrophy',
+        durationMin,
+      });
       if (res.success && res.data) {
         setWorkoutPlan(res.data);
-        setActiveTab('today');
+        setIsLiveTrackerOpen(true);
       }
     } catch (err) {
-      console.error('Generate abs error:', err);
+      console.error('Quick start error:', err);
     } finally {
       setLoading(false);
     }
@@ -140,7 +89,6 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
       exerciseId: replacementCandidate.exerciseId,
       name: replacementCandidate.name,
       primaryMuscle: replacementCandidate.primaryMuscle,
-      secondaryMuscles: replacementCandidate.secondaryMuscles,
       equipment: replacementCandidate.equipment,
       difficulty: replacementCandidate.difficulty,
       sets: 3,
@@ -151,323 +99,107 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
     setWorkoutPlan(updated);
   };
 
-  const muscleOptions = ['all', 'chest', 'back', 'shoulders', 'biceps', 'triceps', 'abs', 'quads', 'glutes', 'calves'];
-  const equipmentOptions = ['all', 'Dumbbell', 'Barbell', 'Cable', 'Machine', 'Bodyweight', 'EZ Bar'];
-
   return (
-    <div className="w-full h-full flex flex-col bg-slate-950 text-slate-100 overflow-y-auto pb-24 font-['Plus_Jakarta_Sans',sans-serif] no-scrollbar">
-      {/* Top Header */}
-      <div className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md px-5 py-3 border-b border-slate-800/80 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
-            <Dumbbell className="w-5 h-5 text-emerald-400" />
-            <span>NutriRegion Workout Studio</span>
-          </h2>
-          <p className="text-[11px] text-slate-400">Structured ACSM programming & equipment-aware exercise library</p>
+    <div className="w-full h-full flex flex-col bg-[#030B16] text-white overflow-hidden font-['Inter',sans-serif]">
+      {/* Top Fixed Header */}
+      <div className="sticky top-0 z-20 bg-[#030B16]/95 backdrop-blur-md px-5 py-3 border-b border-[#14233A] flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#00D084]/20 border border-[#00D084]/30 text-[#00D084] flex items-center justify-center">
+            <Dumbbell className="w-5 h-5 stroke-[2.5]" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-white tracking-tight leading-tight">NutriRegion Workout</h2>
+            <p className="text-[10px] text-[#9AA8BA] font-medium">Personalized fitness & ACSM guidance</p>
+          </div>
         </div>
 
         <button
           onClick={() => setIsAIModalOpen(true)}
-          className="p-2 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-300 hover:bg-teal-500/30 transition flex items-center space-x-1"
-          title="Ask AI Workout Builder"
+          className="px-3 py-1.5 rounded-xl bg-[#0D1728] border border-[#00D084]/40 text-[#00D084] hover:bg-[#152238] transition flex items-center space-x-1.5 shadow"
         >
-          <Sparkles className="w-4 h-4 animate-pulse" />
+          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
           <span className="text-xs font-bold hidden sm:inline">AI Builder</span>
         </button>
       </div>
 
-      {/* Main Tab Navigation */}
-      <div className="px-5 pt-3 flex space-x-2 border-b border-slate-800/80 overflow-x-auto no-scrollbar">
+      {/* Sub-Tab Navigation Bar */}
+      <div className="bg-[#0D1728] border-b border-[#1A2A42] px-3 py-2 flex items-center space-x-1 overflow-x-auto no-scrollbar flex-shrink-0">
         {[
-          { id: 'today', label: "Today's Workout" },
-          { id: 'library', label: 'Exercise Library' },
-          { id: 'abs', label: 'Abs / Core Module' },
-          { id: 'templates', label: 'Saved Templates' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'border-emerald-400 text-emerald-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { id: 'routine', label: 'My Routine', icon: Calendar },
+          { id: 'library', label: 'Workout Library', icon: Search },
+          { id: 'activity', label: 'Activity Tracking', icon: Activity },
+        ].map((tab) => {
+          const IconComp = tab.icon;
+          const isActive = activeSubTab === tab.id && !selectedCategoryTitle && !selectedWorkoutDetails;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setSelectedCategoryTitle(null);
+                setSelectedWorkoutDetails(null);
+                setActiveSubTab(tab.id as any);
+              }}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 whitespace-nowrap ${
+                isActive
+                  ? 'bg-[#00D084] text-[#030B16] shadow-md shadow-[#00D084]/20 font-extrabold'
+                  : 'text-[#9AA8BA] hover:text-white hover:bg-[#152238]'
+              }`}
+            >
+              <IconComp className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* TAB 1: TODAY'S WORKOUT */}
-      {activeTab === 'today' && (
-        <div className="p-5 space-y-4">
-          {loading ? (
-            <div className="py-16 text-center text-xs text-slate-400 flex flex-col items-center space-y-2">
-              <Dumbbell className="w-7 h-7 text-emerald-400 animate-bounce" />
-              <span>Loading today's workout plan...</span>
-            </div>
-          ) : workoutPlan ? (
-            <>
-              {/* Workout Hero Summary Card */}
-              <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-slate-800 p-4 rounded-3xl space-y-3.5 shadow-xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-emerald-500/30">
-                    {workoutPlan.focusArea || 'Workout Routine'}
-                  </span>
-                  <button
-                    onClick={() => setIsCustomizeModalOpen(true)}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-750 text-emerald-400 hover:text-emerald-300 text-xs font-bold rounded-xl border border-slate-700 transition"
-                  >
-                    Customize Today's Workout
-                  </button>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-black text-white tracking-tight">{workoutPlan.title}</h3>
-                  {workoutPlan.selectionReasoning && (
-                    <p className="text-[11px] text-slate-400 mt-1">{workoutPlan.selectionReasoning}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                  <div className="bg-slate-800/60 p-2.5 rounded-2xl border border-slate-700/50">
-                    <Clock className="w-4 h-4 text-emerald-400 mx-auto mb-0.5" />
-                    <span className="text-[10px] text-slate-400 block font-medium">Duration</span>
-                    <span className="text-xs font-bold text-white">{workoutPlan.estimatedDurationMin || 45} mins</span>
-                  </div>
-                  <div className="bg-slate-800/60 p-2.5 rounded-2xl border border-slate-700/50">
-                    <Flame className="w-4 h-4 text-amber-400 mx-auto mb-0.5" />
-                    <span className="text-[10px] text-slate-400 block font-medium">Est. Burn</span>
-                    <span className="text-xs font-bold text-amber-300">{workoutPlan.totalCaloriesBurn || 320} kcal</span>
-                  </div>
-                  <div className="bg-slate-800/60 p-2.5 rounded-2xl border border-slate-700/50">
-                    <Award className="w-4 h-4 text-teal-300 mx-auto mb-0.5" />
-                    <span className="text-[10px] text-slate-400 block font-medium">Exercises</span>
-                    <span className="text-xs font-bold text-teal-300">{workoutPlan.exercises?.length || 0} Movements</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Start Workout Primary Action */}
-              <button
-                onClick={() => setIsLiveTrackerOpen(true)}
-                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-2 transition"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Start Today's Workout Tracker</span>
-              </button>
-
-              {/* Exercise Routine List */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Exercise Routine</h4>
-                  <span className="text-[11px] text-slate-500">Tap exercise to view details or replace</span>
-                </div>
-
-                {workoutPlan.exercises.map((ex: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl flex items-center justify-between transition group"
-                  >
-                    <div className="flex items-center space-x-3.5 flex-1">
-                      <img
-                        src={ex.media?.url || 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80'}
-                        alt={ex.name}
-                        className="w-12 h-12 rounded-xl object-cover border border-slate-800"
-                      />
-                      <div>
-                        <h5 className="text-xs font-bold text-white group-hover:text-emerald-300">{ex.name}</h5>
-                        <div className="text-[11px] text-slate-400 flex items-center space-x-2 mt-0.5">
-                          <span className="text-emerald-400 font-semibold">{ex.sets || 3} Sets × {ex.targetReps || ex.reps || '10'}</span>
-                          <span>•</span>
-                          <span>{ex.equipment || 'Dumbbell'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-1.5">
-                      <button
-                        onClick={() => handleSingleExerciseReplace(idx, ex.exerciseId || ex._id)}
-                        className="p-1.5 rounded-lg bg-slate-800 text-amber-300 hover:bg-amber-500/20 text-[10px] font-bold flex items-center space-x-1 border border-slate-700"
-                        title="Replace this exercise"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Replace</span>
-                      </button>
-
-                      {ex.exerciseId && (
-                        <button
-                          onClick={() => setSelectedExerciseId(ex.exerciseId)}
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
-                        >
-                          <Info className="w-4 h-4 text-emerald-400" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="py-16 text-center space-y-3">
-              <p className="text-xs text-slate-400">No workout active for today.</p>
-              <button
-                onClick={() => setIsCustomizeModalOpen(true)}
-                className="px-4 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl"
-              >
-                Customize Workout Now
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: EXERCISE LIBRARY & SEARCH */}
-      {activeTab === 'library' && (
-        <div className="p-5 space-y-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search exercise 'back dumbbell', 'biceps machine', 'abs'..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Muscle Filters */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Filter Muscle</span>
-            <div className="flex space-x-1.5 overflow-x-auto no-scrollbar">
-              {muscleOptions.map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setSelectedMuscle(m)}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition ${
-                    selectedMuscle === m
-                      ? 'bg-emerald-500 text-slate-950'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Equipment Filters */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Filter Equipment</span>
-            <div className="flex space-x-1.5 overflow-x-auto no-scrollbar">
-              {equipmentOptions.map((eq) => (
-                <button
-                  key={eq}
-                  onClick={() => setSelectedEquipment(eq)}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition ${
-                    selectedEquipment === eq
-                      ? 'bg-amber-500 text-slate-950'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-                >
-                  {eq}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Exercise Library Results List */}
-          {libraryLoading ? (
-            <div className="py-12 text-center text-xs text-slate-400">Searching exercises...</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              {libraryExercises.map((ex) => (
-                <div
-                  key={ex._id}
-                  onClick={() => setSelectedExerciseId(ex._id)}
-                  className="p-3 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl flex items-center space-x-3 cursor-pointer transition group"
-                >
-                  <img
-                    src={ex.media?.url || ex.imageUrl || 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80'}
-                    alt={ex.name}
-                    className="w-14 h-14 rounded-xl object-cover border border-slate-800"
-                  />
-                  <div className="flex-1">
-                    <h5 className="text-xs font-bold text-white group-hover:text-emerald-300">{ex.name}</h5>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
-                      <span className="text-emerald-400 font-semibold">{ex.primaryMuscle}</span> • {ex.equipment}
-                    </div>
-                    <span className="text-[9px] text-slate-500 capitalize">{ex.difficulty} difficulty</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-600" />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: ABS / CORE MODULE */}
-      {activeTab === 'abs' && (
-        <div className="p-5 space-y-4">
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-2">
-            <h3 className="text-sm font-bold text-white">Dedicated Abs & Core Studio</h3>
-            <p className="text-xs text-slate-400">
-              Select a quick core workout duration preset. Includes upper abs, lower abs, obliques, and anti-extension core exercises.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {[10, 15, 20, 30].map((dur) => (
-              <button
-                key={dur}
-                onClick={() => handleGenerateAbs(dur)}
-                className="p-4 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl text-left transition group"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg font-black text-white">{dur} Mins</span>
-                  <Zap className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                </div>
-                <div className="text-xs font-semibold text-emerald-300">Abs / Core Routine</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Weighted crunches, raises & planks</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: SAVED TEMPLATES */}
-      {activeTab === 'templates' && (
-        <div className="p-5 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Workout Templates</h3>
-          {templates.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-500 bg-slate-900 rounded-2xl border border-slate-800">
-              No saved templates. Customize a workout and save it as a template!
-            </div>
-          ) : (
-            templates.map((tpl) => (
-              <div key={tpl._id} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-white">{tpl.title}</h4>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {tpl.focusArea} • {tpl.estimatedDurationMin} mins • {tpl.exercises?.length || 0} exercises
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setWorkoutPlan(tpl);
-                    setActiveTab('today');
-                  }}
-                  className="px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl"
-                >
-                  Load Routine
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      {/* Scrollable View Content */}
+      <div className="flex-1 overflow-y-auto p-5 pb-24 no-scrollbar">
+        {selectedWorkoutDetails ? (
+          <WorkoutDetailsScreen
+            workout={selectedWorkoutDetails}
+            onBack={() => setSelectedWorkoutDetails(null)}
+            onStartWorkoutSession={(wk) => {
+              setWorkoutPlan(wk);
+              setIsLiveTrackerOpen(true);
+            }}
+          />
+        ) : selectedCategoryTitle ? (
+          <CategoryWorkoutListScreen
+            categoryTitle={selectedCategoryTitle}
+            onBack={() => setSelectedCategoryTitle(null)}
+            onSelectWorkout={(wk) => setSelectedWorkoutDetails(wk)}
+          />
+        ) : activeSubTab === 'dashboard' ? (
+          <WorkoutDashboard
+            user={user}
+            workoutPlan={workoutPlan}
+            isCompletedToday={isCompletedToday}
+            onStartWorkout={() => setIsLiveTrackerOpen(true)}
+            onCustomizeWorkout={() => setIsCustomizeModalOpen(true)}
+            onSelectQuickStart={handleSelectQuickStart}
+            onNavigateToTab={(tab) => setActiveSubTab(tab as any)}
+          />
+        ) : activeSubTab === 'routine' ? (
+          <MyRoutineScreen
+            onStartWorkoutForDay={(dayKey) => {
+              loadTodayWorkout(dayKey);
+              setIsLiveTrackerOpen(true);
+            }}
+            onCreatePersonalRoutine={() => setIsCustomizeModalOpen(true)}
+          />
+        ) : activeSubTab === 'library' ? (
+          <WorkoutLibraryScreen
+            onSelectCategory={(categoryTitle) => setSelectedCategoryTitle(categoryTitle)}
+          />
+        ) : activeSubTab === 'activity' ? (
+          <ActivityTrackerScreen
+            onActivityLogged={() => {
+              if (onLogSuccess) onLogSuccess();
+            }}
+          />
+        ) : null}
+      </div>
 
       {/* Modals */}
       <CustomizeWorkoutModal
@@ -475,7 +207,9 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
         onClose={() => setIsCustomizeModalOpen(false)}
         onWorkoutGenerated={(workout) => {
           setWorkoutPlan(workout);
-          setActiveTab('today');
+          setSelectedWorkoutDetails(null);
+          setSelectedCategoryTitle(null);
+          setActiveSubTab('dashboard');
         }}
       />
 
@@ -502,7 +236,9 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
         onClose={() => setIsAIModalOpen(false)}
         onWorkoutGenerated={(workout) => {
           setWorkoutPlan(workout);
-          setActiveTab('today');
+          setSelectedWorkoutDetails(null);
+          setSelectedCategoryTitle(null);
+          setActiveSubTab('dashboard');
         }}
       />
 

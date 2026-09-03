@@ -275,6 +275,10 @@ export const workoutApi = {
     const res = await api.get('/workouts/today', { params: { day } });
     return res.data;
   },
+  getRoutine: async () => {
+    const res = await api.get('/workouts/routine');
+    return res.data;
+  },
   generateWorkout: async (params: {
     muscleGroups?: string[];
     goal?: string;
@@ -307,6 +311,20 @@ export const workoutApi = {
   },
   customizeWorkout: async (workoutPlanId: string, exercises: any[], title?: string) => {
     const res = await api.put(`/workouts/customize/${workoutPlanId}`, { exercises, title });
+    return res.data;
+  },
+  logActivity: async (data: {
+    type: 'walking' | 'running' | 'cycling' | 'swimming';
+    intensity?: 'low' | 'moderate' | 'high';
+    durationMinutes: number;
+    distanceKm: number;
+    caloriesBurned: number;
+  }) => {
+    const res = await api.post('/workouts/activity', data);
+    return res.data;
+  },
+  getHistory: async () => {
+    const res = await api.get('/workouts/history');
     return res.data;
   },
   getTemplates: async () => {
@@ -386,12 +404,40 @@ export const exerciseApi = {
 
 
 export const notificationApi = {
-  getNotifications: async () => {
-    const res = await api.get('/notifications');
+  getNotifications: async (params?: { category?: string; type?: string; isRead?: boolean }) => {
+    const res = await api.get('/notifications', { params });
+    return res.data;
+  },
+  getUnreadCount: async () => {
+    const res = await api.get('/notifications/unread-count');
     return res.data;
   },
   markAsRead: async (id: string) => {
-    const res = await api.put(`/notifications/${id}/read`);
+    const res = await api.patch(`/notifications/${id}/read`);
+    return res.data;
+  },
+  markAllAsRead: async () => {
+    const res = await api.patch('/notifications/read-all');
+    return res.data;
+  },
+  deleteNotification: async (id: string) => {
+    const res = await api.delete(`/notifications/${id}`);
+    return res.data;
+  },
+  getPreferences: async () => {
+    const res = await api.get('/notifications/preferences');
+    return res.data;
+  },
+  updatePreferences: async (data: any) => {
+    const res = await api.put('/notifications/preferences', data);
+    return res.data;
+  },
+  registerDevice: async (deviceData: { deviceId: string; platform?: string; browser?: string; pushToken?: string; subscriptionJson?: any }) => {
+    const res = await api.post('/notifications/device', deviceData);
+    return res.data;
+  },
+  sendTestNotification: async (payload?: { type?: string; title?: string; message?: string }) => {
+    const res = await api.post('/notifications/test', payload || {});
     return res.data;
   },
 };

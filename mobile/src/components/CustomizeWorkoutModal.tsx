@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Dumbbell, Zap, Check, Flame, Clock, Award } from 'lucide-react';
+import { X, Check, Sparkles, Zap, ChevronDown, Award } from 'lucide-react';
 import { workoutApi } from '../services/api';
 
 interface Props {
@@ -8,31 +8,35 @@ interface Props {
   onWorkoutGenerated: (workout: any) => void;
 }
 
-export const CustomizeWorkoutModal: React.FC<Props> = ({ isOpen, onClose, onWorkoutGenerated }) => {
-  const [selectedMuscles, setSelectedMuscles] = useState<string[]>(['back', 'biceps']);
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>(['Dumbbell', 'Barbell', 'Cable', 'Machine', 'Bodyweight', 'Bench']);
-  const [goal, setGoal] = useState<'hypertrophy' | 'strength' | 'fat_loss' | 'general'>('hypertrophy');
-  const [experienceLevel, setExperienceLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
-  const [durationMin, setDurationMin] = useState<number>(45);
+export const CustomizeWorkoutModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onWorkoutGenerated,
+}) => {
+  const [selectedMuscles, setSelectedMuscles] = useState<string[]>(['Back', 'Biceps']);
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>(['Dumbbell', 'Barbell']);
+  const [selectedGoal, setSelectedGoal] = useState<string>('hypertrophy');
+  const [experienceLevel, setExperienceLevel] = useState<string>('beginner');
+  const [durationMin, setDurationMin] = useState<number>(30);
   const [loading, setLoading] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
-  const muscleOptions = [
-    { id: 'chest', label: 'Chest' },
-    { id: 'back', label: 'Back' },
-    { id: 'shoulders', label: 'Shoulders' },
-    { id: 'biceps', label: 'Biceps' },
-    { id: 'triceps', label: 'Triceps' },
-    { id: 'forearms', label: 'Forearms' },
-    { id: 'quads', label: 'Quads' },
-    { id: 'hamstrings', label: 'Hamstrings' },
-    { id: 'glutes', label: 'Glutes' },
-    { id: 'calves', label: 'Calves' },
-    { id: 'abs', label: 'Abs / Core' },
+  const musclesList = [
+    'Chest',
+    'Back',
+    'Shoulders',
+    'Biceps',
+    'Triceps',
+    'Forearms',
+    'Quads',
+    'Hamstrings',
+    'Glutes',
+    'Calves',
+    'Abs / Core',
   ];
 
-  const equipmentOptions = [
+  const equipmentList = [
     'Dumbbell',
     'Barbell',
     'Cable',
@@ -45,9 +49,36 @@ export const CustomizeWorkoutModal: React.FC<Props> = ({ isOpen, onClose, onWork
     'Bench',
   ];
 
-  const toggleMuscle = (id: string) => {
+  const goalsList = [
+    {
+      id: 'hypertrophy',
+      title: 'Hypertrophy / Muscle Gain',
+      recommendation: '3–4 sets × 8–12 reps',
+      desc: 'Optimized for muscle size and growth',
+    },
+    {
+      id: 'strength',
+      title: 'Strength & Power',
+      recommendation: '3–5 sets × 4–6 heavy reps',
+      desc: 'Heavy loading with longer rest periods',
+    },
+    {
+      id: 'fat_loss',
+      title: 'Fat Loss / Conditioning',
+      recommendation: '3 sets × 12–15 reps',
+      desc: 'Higher reps with shorter rest intervals',
+    },
+    {
+      id: 'general_fitness',
+      title: 'General Fitness',
+      recommendation: '3 sets × 10–12 reps',
+      desc: 'Balanced volume for overall health & endurance',
+    },
+  ];
+
+  const toggleMuscle = (muscle: string) => {
     setSelectedMuscles((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+      prev.includes(muscle) ? prev.filter((m) => m !== muscle) : [...prev, muscle]
     );
   };
 
@@ -58,16 +89,15 @@ export const CustomizeWorkoutModal: React.FC<Props> = ({ isOpen, onClose, onWork
   };
 
   const handleGenerate = async () => {
-    if (selectedMuscles.length === 0) return;
     try {
       setLoading(true);
       const res = await workoutApi.generateWorkout({
-        muscleGroups: selectedMuscles,
-        goal,
+        muscleGroups: selectedMuscles.map((m) => m.toLowerCase().replace(' / core', '')),
+        goal: selectedGoal,
         experienceLevel,
         availableEquipment: selectedEquipment,
         durationMin,
-        includeAbs: selectedMuscles.includes('abs'),
+        includeAbs: selectedMuscles.includes('Abs / Core'),
       });
 
       if (res.success && res.data) {
@@ -75,125 +105,126 @@ export const CustomizeWorkoutModal: React.FC<Props> = ({ isOpen, onClose, onWork
         onClose();
       }
     } catch (err) {
-      console.error('Failed generating workout:', err);
+      console.error('Failed to generate customized workout:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-[#030B16]/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+      <div className="bg-[#0D1728] border border-[#1F2F4A] w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-              <Dumbbell className="w-6 h-6 stroke-[2]" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Customize Today's Workout</h3>
-              <p className="text-xs text-slate-400">Select target muscles, equipment & goals</p>
-            </div>
+        <div className="p-5 border-b border-[#1A2A42] flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
+              <Sparkles className="w-5 h-5 text-[#00D084]" />
+              <span>Customize Today's Workout</span>
+            </h2>
+            <p className="text-xs text-[#9AA8BA] mt-0.5">Select target muscles, equipment & goals</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-[#152238] text-[#9AA8BA] hover:text-white border border-[#203350]"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto my-4 space-y-5 pr-1 no-scrollbar">
-          {/* 1. Target Muscle Groups */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+        {/* Scrollable Content */}
+        <div className="p-5 space-y-6 overflow-y-auto flex-1 no-scrollbar">
+          {/* SECTION 1: TARGET MUSCLES */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-bold text-[#9AA8BA] uppercase tracking-wider">
               What do you want to train today?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {muscleOptions.map((m) => {
-                const isSelected = selectedMuscles.includes(m.id);
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {musclesList.map((muscle) => {
+                const isSelected = selectedMuscles.includes(muscle);
                 return (
                   <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => toggleMuscle(m.id)}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-between border transition ${
+                    key={muscle}
+                    onClick={() => toggleMuscle(muscle)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
                       isSelected
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                        : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-white'
+                        ? 'bg-[#00D084]/20 border-2 border-[#00D084] text-[#00D084] shadow-sm'
+                        : 'bg-[#152238] border border-[#203350] text-slate-300 hover:text-white'
                     }`}
                   >
-                    <span>{m.label}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />}
+                    <span>{muscle}</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* 2. Available Equipment */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+          {/* SECTION 2: AVAILABLE EQUIPMENT */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-bold text-[#9AA8BA] uppercase tracking-wider">
               Available Equipment
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {equipmentOptions.map((eq) => {
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {equipmentList.map((eq) => {
                 const isSelected = selectedEquipment.includes(eq);
                 return (
                   <button
                     key={eq}
-                    type="button"
                     onClick={() => toggleEquipment(eq)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
                       isSelected
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                        : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white'
+                        ? 'bg-[#00D084]/20 border-2 border-[#00D084] text-[#00D084]'
+                        : 'bg-[#152238] border border-[#203350] text-slate-300 hover:text-white'
                     }`}
                   >
-                    {eq}
+                    <span>{eq}</span>
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* 3. Training Goal */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
-              Fitness Goal (ACSM Volume Guidelines)
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'hypertrophy', label: 'Hypertrophy / Muscle Gain', desc: '3–4 sets × 8–12 reps' },
-                { id: 'strength', label: 'Strength & Power', desc: '3–5 sets × 4–6 heavy reps' },
-                { id: 'fat_loss', label: 'Fat Loss / Conditioning', desc: '3 sets × 12–15 reps (45s rest)' },
-                { id: 'general', label: 'General Fitness', desc: '3 sets × 10–12 reps' },
-              ].map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setGoal(g.id as any)}
-                  className={`p-3 rounded-2xl text-left border transition ${
-                    goal === g.id
-                      ? 'bg-teal-500/20 border-teal-400 text-teal-200'
-                      : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-white mb-0.5">{g.label}</div>
-                  <div className="text-[10px] text-slate-400">{g.desc}</div>
-                </button>
-              ))}
+          {/* SECTION 3: FITNESS GOAL (ACSM VOLUME GUIDELINES) */}
+          <div className="space-y-2.5">
+            <h3 className="text-xs font-bold text-[#9AA8BA] uppercase tracking-wider flex items-center space-x-1.5">
+              <Award className="w-4 h-4 text-[#00D084]" />
+              <span>Fitness Goal (ACSM Volume Guidelines)</span>
+            </h3>
+            <div className="space-y-2">
+              {goalsList.map((goal) => {
+                const isSelected = selectedGoal === goal.id;
+                return (
+                  <div
+                    key={goal.id}
+                    onClick={() => setSelectedGoal(goal.id)}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-[#00D084]/15 border-2 border-[#00D084] text-white shadow-md'
+                        : 'bg-[#152238] border-[#203350] hover:border-[#2A4268]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold text-white">{goal.title}</h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/30">
+                        {goal.recommendation}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#9AA8BA] mt-1">{goal.desc}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* 4. Experience Level & Duration */}
+          {/* SECTION 4 & 5: EXPERIENCE & DURATION */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Experience
-              </label>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#9AA8BA] uppercase tracking-wider block">Experience</label>
               <select
                 value={experienceLevel}
-                onChange={(e) => setExperienceLevel(e.target.value as any)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                onChange={(e) => setExperienceLevel(e.target.value)}
+                className="w-full bg-[#152238] border border-[#203350] rounded-xl px-3 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-[#00D084]"
               >
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
@@ -201,35 +232,34 @@ export const CustomizeWorkoutModal: React.FC<Props> = ({ isOpen, onClose, onWork
               </select>
             </div>
 
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-1.5">
-                Workout Duration
-              </label>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#9AA8BA] uppercase tracking-wider block">Duration</label>
               <select
                 value={durationMin}
                 onChange={(e) => setDurationMin(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                className="w-full bg-[#152238] border border-[#203350] rounded-xl px-3 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-[#00D084]"
               >
-                <option value={15}>15 Mins (Quick Session)</option>
-                <option value={20}>20 Mins</option>
-                <option value={30}>30 Mins</option>
-                <option value={45}>45 Mins</option>
-                <option value={60}>60 Mins</option>
-                <option value={75}>75+ Mins</option>
+                <option value={15}>15 mins</option>
+                <option value={30}>30 mins</option>
+                <option value={45}>45 mins</option>
+                <option value={60}>60 mins</option>
+                <option value={75}>75 mins</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Generate Button */}
-        <button
-          onClick={handleGenerate}
-          disabled={loading || selectedMuscles.length === 0}
-          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-2xl shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-2 transition disabled:opacity-40"
-        >
-          <Zap className={`w-4 h-4 fill-current ${loading ? 'animate-bounce' : ''}`} />
-          <span>{loading ? 'Generating Structured Workout...' : 'Generate Customized Session'}</span>
-        </button>
+        {/* Footer CTA */}
+        <div className="p-5 border-t border-[#1A2A42] bg-[#0D1728]">
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className="w-full py-3.5 bg-[#00D084] hover:bg-[#00C98A] text-[#030B16] font-extrabold text-sm rounded-2xl shadow-xl shadow-[#00D084]/25 flex items-center justify-center space-x-2 transition disabled:opacity-50"
+          >
+            <Zap className="w-4 h-4 fill-current stroke-none" />
+            <span>{loading ? 'Generating Workout...' : '⚡ Generate Customized Session'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

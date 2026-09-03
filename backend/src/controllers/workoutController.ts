@@ -4,8 +4,11 @@ import { WorkoutService } from '../services/workoutService.js';
 import { WorkoutGeneratorService } from '../services/workoutGeneratorService.js';
 import { WorkoutAIQueryService } from '../services/workoutAIQueryService.js';
 import { WorkoutLog } from '../models/WorkoutLog.js';
+import { WorkoutPlan } from '../models/WorkoutPlan.js';
 import { WorkoutTemplate } from '../models/WorkoutTemplate.js';
 import { ExerciseProgress } from '../models/ExerciseProgress.js';
+import { ActivityLog } from '../models/ActivityLog.js';
+import { eventBus } from '../services/eventEngine.js';
 
 export class WorkoutController {
   /**
@@ -167,6 +170,15 @@ export class WorkoutController {
         }
       }
 
+      // Emit WORKOUT_COMPLETED Event
+      eventBus.emit('WORKOUT_COMPLETED', {
+        userId: userId.toString(),
+        workoutTitle: workoutTitle || 'Workout Session',
+        exercisesCount: Array.isArray(completedExercises) ? completedExercises.length : 9,
+        durationMin: Number(durationMinutes) || 45,
+        caloriesBurned: Number(caloriesBurned) || 320,
+      });
+
       return res.status(201).json({
         success: true,
         message: 'Workout session logged & progressive overload updated',
@@ -256,4 +268,93 @@ export class WorkoutController {
       return res.status(500).json({ success: false, message: error.message });
     }
   }
+
+  /**
+   * GET My Routine schedule & completed week days
+   */
+  public static async getRoutine(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!._id;
+      const weekStart = new Date();
+      const dayOfWeek = weekStart.getDay();
+      const diffToMon = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+      weekStart.setDate(weekStart.getDate() + diffToMon);
+      weekStart.setHours(0, 0, 0, 0);
+
+      const logs = await WorkoutLog.find({
+        userId,
+        completedAt: { $gte: weekStart },
+      });
+
+      const completedDaysMap: Record<string, boolean> = {};
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+      logs.forEach((log) => {
+        const d = dayNames[new Date(log.completedAt).getDay()];
+        completedDaysMap[d] = true;
+      });
+
+      const plans = await WorkoutPlan.find({ isActive: true });
+
+      return res.json({
+        success: true,
+        data: {
+          completedDays: completedDaysMap,
+          weeklyPlan: plans,
+        },
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * Log Activity (Walking, Running, Cycling, Swimming)
+   */
+  public static async logActivity(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!._id;
+      const { type, intensity, durationMinutes, distanceKm, caloriesBurned } = req.body;
+
+      const activity = await ActivityLog.create({
+        userId,
+        type,
+        intensity: intensity || 'moderate',
+        durationMinutes: Number(durationMinutes) || 0,
+        distanceKm: Number(distanceKm) || 0,
+        caloriesBurned: Number(caloriesBurned) || 0,
+        completedAt: new Date(),
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Activity tracked successfully',
+        data: activity,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * GET Workout & Activity History
+   */
+  public static async getWorkoutHistory(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user!._id;
+      const workoutLogs = await WorkoutLog.find({ userId }).sort({ completedAt: -1 }).limit(20);
+      const activityLogs = await ActivityLog.find({ userId }).sort({ completedAt: -1 }).limit(20);
+
+      return res.json({
+        success: true,
+        data: {
+          workoutLogs,
+          activityLogs,
+        },
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
+

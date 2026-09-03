@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import http from 'http';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,6 +9,8 @@ import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/db.js';
 import { seedDatabase } from './seed.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { SocketService } from './services/socketService.js';
+import { SchedulerService } from './services/schedulerService.js';
 
 import authRoutes from './routes/authRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
@@ -30,7 +33,6 @@ import recipeRoutes from './routes/recipeRoutes.js';
 
 dotenv.config();
 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -44,7 +46,6 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, native fetch, postman, curl) or matching allowed origins
       if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes('*') || allowedOrigins.some((o) => origin.startsWith(o))) {
         callback(null, true);
       } else {
@@ -140,19 +141,28 @@ app.use('/api/health-metrics', healthRoutes);
 app.use('/api/food-log', foodLogRoutes);
 app.use('/api/recipes', recipeRoutes);
 
-
 // Error Handler
 app.use(errorHandler);
+
+// HTTP Server Wrap & Socket.IO Attachment
+const server = http.createServer(app);
 
 // Start Server & Connect Database
 const startServer = async () => {
   await connectDB();
   await seedDatabase();
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  // Initialize Socket.IO Gateway
+  SocketService.init(server);
+
+  // Initialize Scheduler Cron Jobs
+  SchedulerService.init();
+
+  server.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`  Regional AI Diet & Fitness API Server running on port ${PORT}`);
-    console.log(`  LAN Host Access: http://0.0.0.0:${PORT} (Bound to all network interfaces)`);
+    console.log(`  Real-Time Socket.IO: Active on ws://localhost:${PORT}/socket.io`);
+    console.log(`  LAN Host Access: http://0.0.0.0:${PORT}`);
     console.log(`  Health Check: http://localhost:${PORT}/api/health`);
     console.log(`  Swagger API Docs: http://localhost:${PORT}/api-docs`);
     console.log(`=======================================================`);
