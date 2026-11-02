@@ -23,7 +23,7 @@ export class OtpService {
     target: string,
     type: 'email' | 'phone',
     action: 'register' | 'login' | 'link'
-  ): Promise<{ success: boolean; message: string; cooldownSeconds: number }> {
+  ): Promise<{ success: boolean; message: string; cooldownSeconds: number; devOtp?: string }> {
     const normalizedTarget = target.trim().toLowerCase();
     const existing = await OtpRecord.findOne({ target: normalizedTarget, type });
 
@@ -54,28 +54,35 @@ export class OtpService {
     await OtpRecord.findOneAndUpdate(
       { target: normalizedTarget, type },
       {
-        action,
-        otpHash,
-        expiresAt,
-        attempts: 0,
+        $set: {
+          action,
+          otpHash,
+          otp: plaintextOtp, // Stored in DB as plaintext for inspection
+          devOtp: plaintextOtp, // Stored in DB as plaintext for inspection
+          expiresAt,
+          attempts: 0,
+          lastResendAt: now,
+        },
         $inc: { resendCount: existing ? 1 : 0 },
-        lastResendAt: now,
       },
       { upsert: true, new: true }
     );
 
     // Development Console Sandbox Output
-    console.log(`=======================================================`);
-    console.log(` 🔐 [NUTRIREGION DEV OTP ENGINE]`);
-    console.log(`  Target (${type.toUpperCase()}): ${normalizedTarget}`);
-    console.log(`  Action: ${action.toUpperCase()}`);
-    console.log(`  OTP Code: >>> ${plaintextOtp} <<< (Expires in 5 mins)`);
-    console.log(`=======================================================`);
+    console.log(`\n=======================================================`);
+    console.log(` 🔑 [NUTRIREGION DEV OTP CODE GENERATED]`);
+    console.log(`  TARGET (${type.toUpperCase()}): ${normalizedTarget}`);
+    console.log(`  ACTION: ${action.toUpperCase()}`);
+    console.log(`  -------------------------------------------------------`);
+    console.log(`  👉 YOUR OTP CODE IS:  >>>  ${plaintextOtp}  <<<`);
+    console.log(`  (Valid for 5 minutes | Stored in MongoDB OtpRecord document)`);
+    console.log(`=======================================================\n`);
 
     return {
       success: true,
       message: `OTP sent successfully to ${type === 'email' ? 'email' : 'phone number'}.`,
       cooldownSeconds: 30,
+      devOtp: plaintextOtp,
     };
   }
 

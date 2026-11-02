@@ -341,7 +341,7 @@ export const App: React.FC = () => {
 
 
       {currentScreen === 'main' && activeTab === 'workout' && (
-        <WorkoutStudioScreen onLogSuccess={loadTodayMealPlan} />
+        <WorkoutStudioScreen user={user} profile={profile} onLogSuccess={loadTodayMealPlan} />
       )}
 
 
@@ -359,6 +359,8 @@ export const App: React.FC = () => {
             localStorage.removeItem('token');
             setUser(null);
             setProfile(null);
+            setMealPlan(null);
+            setMealItems([]);
             setCurrentScreen('auth');
           }}
         />

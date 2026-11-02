@@ -84,31 +84,64 @@ export const ProfileScreen: React.FC<Props> = ({ user: initialUser, profile, onE
     }
   };
 
-  // Handle Profile Image Selection & Base64 Upload
+  // Handle Profile Image Selection, Compression & Upload
   const handleImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size should be less than 10MB');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        setUploadingImage(true);
-        const base64Url = reader.result as string;
-        const res = await profileApi.updateProfileImage(base64Url);
-        if (res.success && res.data) {
-          setCurrentUser(res.data);
-          if (onUserUpdate) onUserUpdate(res.data);
+    reader.onload = (event) => {
+      setUploadingImage(true);
+      const rawBase64 = event.target?.result as string;
+
+      const img = new Image();
+      img.src = rawBase64;
+      img.onload = async () => {
+        try {
+          const maxDim = 400;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+            const res = await profileApi.updateProfileImage(compressedBase64);
+            if (res.success && res.data) {
+              setCurrentUser(res.data);
+              if (onUserUpdate) onUserUpdate(res.data);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to update profile image:', err);
+        } finally {
+          setUploadingImage(false);
         }
-      } catch (err) {
-        console.error('Failed to update profile image:', err);
-      } finally {
+      };
+      img.onerror = () => {
         setUploadingImage(false);
-      }
+        alert('Failed to process selected image file.');
+      };
     };
     reader.readAsDataURL(file);
   };
@@ -144,7 +177,8 @@ export const ProfileScreen: React.FC<Props> = ({ user: initialUser, profile, onE
 
       if (res.success) {
         setOtpSent(true);
-        setLinkingSuccess(`OTP sent to ${targetVal}. Check server console or inbox.`);
+        setLinkOtp('');
+        setLinkingSuccess(`OTP sent to ${targetVal}. Check server console or database.`);
       } else {
         setLinkingError(res.message || 'Failed to send OTP.');
       }

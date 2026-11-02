@@ -71,7 +71,8 @@ export const AuthScreen: React.FC<Props> = ({ onAuthSuccess, onSkipDemo }) => {
       if (res.success) {
         setStep('otp');
         setCooldown(res.cooldownSeconds || 30);
-        setInfoMessage(`OTP sent to ${authMethod === 'email' ? email : formattedTarget}`);
+        setOtpDigits(['', '', '', '', '', '']);
+        setInfoMessage(`OTP sent to ${authMethod === 'email' ? email : formattedTarget}. Check terminal or database.`);
       } else {
         setError(res.message || 'Failed to send OTP.');
       }

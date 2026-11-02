@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { UserProfile } from '../models/UserProfile.js';
 import { MealLog } from '../models/MealLog.js';
+import { FoodLog } from '../models/FoodLog.js';
 import { WorkoutLog } from '../models/WorkoutLog.js';
 import { HealthMetric } from '../models/HealthMetric.js';
 import { WaterLog } from '../models/WaterLog.js';
@@ -98,15 +99,24 @@ export class HealthDashboardService {
     else if (currentHour >= 17) greetingTime = 'Good evening';
     const greeting = `${greetingTime}, ${userName || 'Friend'}`;
 
-    // 2. Fetch Meal Logs for the date
+    // 2. Fetch Meal Logs & Food Logs for the date
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
+    const targetDateStr = startOfDay.toISOString().split('T')[0];
 
     const mealLogs = await MealLog.find({
       userId,
       consumedAt: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    const foodLogs = await FoodLog.find({
+      userId,
+      $or: [
+        { date: targetDateStr },
+        { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+      ]
     });
 
     let consumedCalories = 0;
@@ -123,15 +133,37 @@ export class HealthDashboardService {
       dinner: 0,
     };
 
-    mealLogs.forEach((log) => {
-      consumedCalories += log.calories || 0;
-      consumedProtein += log.proteinG || 0;
-      consumedCarbs += log.carbsG || 0;
-      consumedFat += log.fatG || 0;
-      if (mealCalories[log.mealType] !== undefined) {
-        mealCalories[log.mealType] += log.calories || 0;
-      }
-    });
+    if (mealLogs.length > 0) {
+      mealLogs.forEach((log) => {
+        consumedCalories += log.calories || 0;
+        consumedProtein += log.proteinG || 0;
+        consumedCarbs += log.carbsG || 0;
+        consumedFat += log.fatG || 0;
+        if (mealCalories[log.mealType] !== undefined) {
+          mealCalories[log.mealType] += log.calories || 0;
+        }
+      });
+    } else {
+      // If no mealLogs, aggregate directly from FoodLog model
+      foodLogs.forEach((log) => {
+        consumedCalories += log.nutrition?.calories || 0;
+        consumedProtein += log.nutrition?.protein || 0;
+        consumedCarbs += log.nutrition?.carbohydrates || 0;
+        consumedFat += log.nutrition?.fat || 0;
+        consumedFiber += log.nutrition?.fiber || 0;
+        
+        let mType = 'lunch';
+        if (log.mealType === 'breakfast') mType = 'breakfast';
+        else if (log.mealType === 'snack') mType = 'evening_snack';
+        else if (log.mealType === 'dinner') mType = 'dinner';
+        else if (log.mealType === 'lunch') mType = 'lunch';
+        else mType = 'morning_snack';
+
+        if (mealCalories[mType] !== undefined) {
+          mealCalories[mType] += log.nutrition?.calories || 0;
+        }
+      });
+    }
 
     // 3. Fetch Workout Logs for the date
     const workoutLogs = await WorkoutLog.find({

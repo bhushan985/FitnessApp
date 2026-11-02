@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Dumbbell, Flame, Clock, Zap, Sparkles, ChevronRight, Activity, Award, Footprints } from 'lucide-react';
 import { ProgressRing } from './ProgressRing';
+import { healthApi } from '../services/api';
 
 interface Props {
   user: any;
@@ -21,7 +22,38 @@ export const WorkoutDashboard: React.FC<Props> = ({
   onSelectQuickStart,
   onNavigateToTab,
 }) => {
-  const userName = user?.name ? user.name.split(' ')[0] : 'Bhushan';
+  const userName = user?.name ? user.name.split(' ')[0] : 'Friend';
+  const [dashboardData, setDashboardData] = useState<any>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    healthApi.getDashboard()
+      .then((res: any) => {
+        if (isMounted && res.success && res.data) {
+          setDashboardData(res.data);
+        }
+      })
+      .catch(console.error);
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const workoutSummary = dashboardData?.summary?.workout || { count: 0, durationMinutes: 0, caloriesBurned: 0 };
+  const stepsSummary = dashboardData?.summary?.steps || { current: 0, target: 10000 };
+
+  const weeklyWorkouts = workoutSummary.count || 0;
+  const weeklyTarget = 5;
+  const burnedCalories = workoutSummary.caloriesBurned || 0;
+  const totalDurationMin = workoutSummary.durationMinutes || 0;
+
+  const currentSteps = stepsSummary.current || 0;
+  const targetSteps = stepsSummary.target || 10000;
+  const stepsProgress = Math.min(100, Math.round((currentSteps / targetSteps) * 100));
+
+  const targetCalorieBurn = 700;
+  const caloriesProgress = Math.min(100, Math.round((burnedCalories / targetCalorieBurn) * 100));
+  const workoutsProgress = Math.min(100, Math.round((weeklyWorkouts / weeklyTarget) * 100));
 
   const title = workoutPlan?.title || 'Lower Body Strength';
   const difficulty = workoutPlan?.difficulty || 'Beginner';
@@ -116,7 +148,7 @@ export const WorkoutDashboard: React.FC<Props> = ({
               <Award className="w-4 h-4" />
               <span className="text-[10px] font-bold text-[#9AA8BA]">Workouts</span>
             </div>
-            <div className="text-lg font-extrabold text-white">3 / 5</div>
+            <div className="text-lg font-extrabold text-white">{weeklyWorkouts} / {weeklyTarget}</div>
             <span className="text-[9px] text-[#9AA8BA] font-medium">This Week</span>
           </div>
 
@@ -125,8 +157,8 @@ export const WorkoutDashboard: React.FC<Props> = ({
               <Flame className="w-4 h-4" />
               <span className="text-[10px] font-bold text-[#9AA8BA]">Calories</span>
             </div>
-            <div className="text-lg font-extrabold text-white">642 <span className="text-xs font-semibold text-[#9AA8BA]">kcal</span></div>
-            <span className="text-[9px] text-[#9AA8BA] font-medium">Target 700 kcal</span>
+            <div className="text-lg font-extrabold text-white">{burnedCalories} <span className="text-xs font-semibold text-[#9AA8BA]">kcal</span></div>
+            <span className="text-[9px] text-[#9AA8BA] font-medium">Target {targetCalorieBurn} kcal</span>
           </div>
 
           <div className="bg-[#0D1728] border border-[#1A2A42] p-3.5 rounded-2xl flex flex-col justify-between">
@@ -134,8 +166,8 @@ export const WorkoutDashboard: React.FC<Props> = ({
               <Clock className="w-4 h-4" />
               <span className="text-[10px] font-bold text-[#9AA8BA]">Duration</span>
             </div>
-            <div className="text-lg font-extrabold text-white">120 <span className="text-xs font-semibold text-[#9AA8BA]">min</span></div>
-            <span className="text-[9px] text-[#9AA8BA] font-medium">3 Sessions</span>
+            <div className="text-lg font-extrabold text-white">{totalDurationMin} <span className="text-xs font-semibold text-[#9AA8BA]">min</span></div>
+            <span className="text-[9px] text-[#9AA8BA] font-medium">{weeklyWorkouts} Sessions</span>
           </div>
         </div>
       </div>
@@ -147,42 +179,42 @@ export const WorkoutDashboard: React.FC<Props> = ({
             <Activity className="w-4 h-4 text-[#00D084]" />
             <span>Daily Activity Rings</span>
           </h2>
-          <span className="text-[11px] font-semibold text-[#00D084]">Goal 85%</span>
+          <span className="text-[11px] font-semibold text-[#00D084]">Goal {Math.round((stepsProgress + caloriesProgress + workoutsProgress) / 3)}%</span>
         </div>
 
         <div className="flex items-center justify-around py-1">
           {/* Steps Ring */}
           <div className="flex flex-col items-center space-y-2">
             <div className="relative flex items-center justify-center">
-              <ProgressRing progress={68} color="#00D084" radius={34} strokeWidth={5} />
+              <ProgressRing progress={stepsProgress} color="#00D084" radius={34} strokeWidth={5} />
               <Footprints className="w-4 h-4 text-[#00D084] absolute" />
             </div>
             <div className="text-center">
-              <div className="text-xs font-bold text-white">6,842</div>
-              <div className="text-[9px] text-[#9AA8BA]">/ 10,000 steps</div>
+              <div className="text-xs font-bold text-white">{currentSteps.toLocaleString()}</div>
+              <div className="text-[9px] text-[#9AA8BA]">/ {targetSteps.toLocaleString()} steps</div>
             </div>
           </div>
 
           {/* Active Calories Ring */}
           <div className="flex flex-col items-center space-y-2">
             <div className="relative flex items-center justify-center">
-              <ProgressRing progress={91} color="#F59E0B" radius={34} strokeWidth={5} />
+              <ProgressRing progress={caloriesProgress} color="#F59E0B" radius={34} strokeWidth={5} />
               <Flame className="w-4 h-4 text-amber-400 absolute" />
             </div>
             <div className="text-center">
-              <div className="text-xs font-bold text-white">642</div>
-              <div className="text-[9px] text-[#9AA8BA]">/ 700 kcal</div>
+              <div className="text-xs font-bold text-white">{burnedCalories}</div>
+              <div className="text-[9px] text-[#9AA8BA]">/ {targetCalorieBurn} kcal</div>
             </div>
           </div>
 
           {/* Workouts Ring */}
           <div className="flex flex-col items-center space-y-2">
             <div className="relative flex items-center justify-center">
-              <ProgressRing progress={60} color="#3B82F6" radius={34} strokeWidth={5} />
+              <ProgressRing progress={workoutsProgress} color="#3B82F6" radius={34} strokeWidth={5} />
               <Award className="w-4 h-4 text-blue-400 absolute" />
             </div>
             <div className="text-center">
-              <div className="text-xs font-bold text-white">3 / 5</div>
+              <div className="text-xs font-bold text-white">{weeklyWorkouts} / {weeklyTarget}</div>
               <div className="text-[9px] text-[#9AA8BA]">workouts</div>
             </div>
           </div>

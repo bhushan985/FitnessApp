@@ -13,15 +13,19 @@ interface MetricProps {
 interface Props {
   isOpen: boolean;
   metrics: MetricProps;
+  user?: any;
   onSave: () => void;
 }
 
 export const WorkoutCompletionModal: React.FC<Props> = ({
   isOpen,
   metrics,
+  user,
   onSave,
 }) => {
   if (!isOpen) return null;
+
+  const userName = user?.name ? user.name.split(' ')[0] : 'Champ';
 
   return (
     <div className="fixed inset-0 z-50 bg-[#030B16]/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn font-['Inter',sans-serif]">
@@ -37,7 +41,7 @@ export const WorkoutCompletionModal: React.FC<Props> = ({
         {/* Title */}
         <div className="space-y-1">
           <h2 className="text-2xl font-black text-white tracking-tight">Workout Complete!</h2>
-          <p className="text-xs text-[#9AA8BA] font-medium">Great job, Bhushan 💪</p>
+          <p className="text-xs text-[#9AA8BA] font-medium">Great job, {userName} 💪</p>
         </div>
 
         {/* Metrics Grid */}

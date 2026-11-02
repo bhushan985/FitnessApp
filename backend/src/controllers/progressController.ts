@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import { UserProfile } from '../models/UserProfile.js';
 import { MealLog } from '../models/MealLog.js';
+import { FoodLog } from '../models/FoodLog.js';
 
 export class ProgressController {
   public static async logWeight(req: AuthRequest, res: Response) {
@@ -52,17 +53,31 @@ export class ProgressController {
           consumedAt: { $gte: d, $lte: endD },
         });
 
-        const dayCal = dayLogs.reduce((sum, l) => sum + l.calories, 0);
-        const dayProtein = dayLogs.reduce((sum, l) => sum + l.proteinG, 0);
+        const targetDateStr = d.toISOString().split('T')[0];
+        const dayFoodLogs = await FoodLog.find({
+          userId,
+          $or: [
+            { date: targetDateStr },
+            { createdAt: { $gte: d, $lte: endD } }
+          ]
+        });
 
-        // Generate synthetic weight trend curve approaching target weight
+        let dayCal = dayLogs.reduce((sum, l) => sum + (l.calories || 0), 0);
+        let dayProtein = dayLogs.reduce((sum, l) => sum + (l.proteinG || 0), 0);
+
+        if (dayLogs.length === 0 && dayFoodLogs.length > 0) {
+          dayCal = dayFoodLogs.reduce((sum, l) => sum + (l.nutrition?.calories || 0), 0);
+          dayProtein = dayFoodLogs.reduce((sum, l) => sum + (l.nutrition?.protein || 0), 0);
+        }
+
+        // Generate weight trend curve approaching target weight
         const weightOffset = (i / timeframeDays) * 0.8;
         const simulatedWeight = Math.round((currentWeight + (currentWeight > targetWeight ? weightOffset : -weightOffset)) * 10) / 10;
 
         chartData.push({
           date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          calories: dayCal || Math.round(1800 + Math.random() * 200),
-          proteinG: dayProtein || Math.round(85 + Math.random() * 20),
+          calories: dayCal,
+          proteinG: dayProtein,
           weightKg: simulatedWeight,
         });
       }

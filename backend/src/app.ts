@@ -149,24 +149,48 @@ const server = http.createServer(app);
 
 // Start Server & Connect Database
 const startServer = async () => {
-  await connectDB();
-  await seedDatabase();
+  console.log(process.env.MONGODB_URI ? 'ℹ️ MONGODB_URI is loaded in environment' : '⚠️ MONGODB_URI is MISSING in environment');
 
-  // Initialize Socket.IO Gateway
-  SocketService.init(server);
+  try {
+    const isFallback = await connectDB();
+    await seedDatabase();
+    if (isFallback) {
+      console.log('🌱 Database initialized with sample data in In-Memory mode.');
+    }
 
-  // Initialize Scheduler Cron Jobs
-  SchedulerService.init();
+    // Initialize Socket.IO Gateway
+    SocketService.init(server);
 
-  server.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`=======================================================`);
-    console.log(`  Regional AI Diet & Fitness API Server running on port ${PORT}`);
-    console.log(`  Real-Time Socket.IO: Active on ws://localhost:${PORT}/socket.io`);
-    console.log(`  LAN Host Access: http://0.0.0.0:${PORT}`);
-    console.log(`  Health Check: http://localhost:${PORT}/api/health`);
-    console.log(`  Swagger API Docs: http://localhost:${PORT}/api-docs`);
-    console.log(`=======================================================`);
-  });
+    // Initialize Scheduler Cron Jobs
+    SchedulerService.init();
+
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`\n=======================================================`);
+        console.error(`[ERROR] Port ${PORT} is already in use by another process.`);
+        console.error(`Please close the existing process running on port ${PORT} before restarting.`);
+        console.error(`On Windows PowerShell, run:`);
+        console.error(`  Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force`);
+        console.error(`=======================================================\n`);
+        process.exit(1);
+      } else {
+        console.error('[ERROR] Server startup error:', err);
+      }
+    });
+
+    server.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`=======================================================`);
+      console.log(`🚀 NutriRegion backend running on port ${PORT}`);
+      console.log(`   Real-Time Socket.IO: Active on ws://localhost:${PORT}/socket.io`);
+      console.log(`   LAN Host Access: http://0.0.0.0:${PORT}`);
+      console.log(`   Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`   Swagger API Docs: http://localhost:${PORT}/api-docs`);
+      console.log(`=======================================================`);
+    });
+  } catch (err) {
+    console.error('❌ Server startup aborted:', err);
+    process.exit(1);
+  }
 };
 
 if (process.env.NODE_ENV !== 'test') {

@@ -3,6 +3,7 @@ import { UserProfile, IUserProfile } from '../models/UserProfile.js';
 import { Food, IFood } from '../models/Food.js';
 import { FoodRegion } from '../models/FoodRegion.js';
 import { MealLog } from '../models/MealLog.js';
+import { FoodLog } from '../models/FoodLog.js';
 import { MealPlanItem } from '../models/MealPlanItem.js';
 import { RecommendationService } from './recommendationService.js';
 
@@ -75,10 +76,20 @@ export class PersonalizationEngine {
     startOfDay.setHours(0, 0, 0, 0);
 
     const logs = await MealLog.find({ userId, consumedAt: { $gte: startOfDay } });
-    const consumedCalories = logs.reduce((sum, log) => sum + (log.calories || 0), 0);
-    const consumedProtein = logs.reduce((sum, log) => sum + (log.proteinG || 0), 0);
-    const consumedCarbs = logs.reduce((sum, log) => sum + (log.carbsG || 0), 0);
-    const consumedFat = logs.reduce((sum, log) => sum + (log.fatG || 0), 0);
+    const todayStr = startOfDay.toISOString().split('T')[0];
+    const foodLogs = await FoodLog.find({ userId, $or: [{ date: todayStr }, { createdAt: { $gte: startOfDay } }] });
+
+    let consumedCalories = logs.reduce((sum, log) => sum + (log.calories || 0), 0);
+    let consumedProtein = logs.reduce((sum, log) => sum + (log.proteinG || 0), 0);
+    let consumedCarbs = logs.reduce((sum, log) => sum + (log.carbsG || 0), 0);
+    let consumedFat = logs.reduce((sum, log) => sum + (log.fatG || 0), 0);
+
+    if (logs.length === 0 && foodLogs.length > 0) {
+      consumedCalories = foodLogs.reduce((sum, log) => sum + (log.nutrition?.calories || 0), 0);
+      consumedProtein = foodLogs.reduce((sum, log) => sum + (log.nutrition?.protein || 0), 0);
+      consumedCarbs = foodLogs.reduce((sum, log) => sum + (log.nutrition?.carbohydrates || 0), 0);
+      consumedFat = foodLogs.reduce((sum, log) => sum + (log.nutrition?.fat || 0), 0);
+    }
 
     const remainingCalories = Math.max(0, targetCalories - consumedCalories);
     const remainingProtein = Math.max(0, Math.round((targetProtein - consumedProtein) * 10) / 10);

@@ -14,6 +14,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   workoutPlan: any;
+  user?: any;
   onReplaceExercise?: (index: number, exerciseId: string) => void;
   onWorkoutCompleted?: () => void;
 }
@@ -22,6 +23,7 @@ export const LiveWorkoutTrackerModal: React.FC<Props> = ({
   isOpen,
   onClose,
   workoutPlan,
+  user,
   onReplaceExercise,
   onWorkoutCompleted,
 }) => {
@@ -346,6 +348,7 @@ export const LiveWorkoutTrackerModal: React.FC<Props> = ({
         <WorkoutCompletionModal
           isOpen={isCompletedSession}
           metrics={completedMetrics}
+          user={user}
           onSave={() => {
             setIsCompletedSession(false);
             if (onWorkoutCompleted) onWorkoutCompleted();

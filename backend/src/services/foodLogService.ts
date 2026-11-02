@@ -1,6 +1,8 @@
 import { FoodLog, IFoodLog } from '../models/FoodLog.js';
+import { MealLog } from '../models/MealLog.js';
 import { FavoriteFood } from '../models/FavoriteFood.js';
 import { Food } from '../models/Food.js';
+import mongoose from 'mongoose';
 
 export interface ILogFoodDTO {
   userId: string;
@@ -9,7 +11,7 @@ export interface ILogFoodDTO {
   foodId?: string;
   foodName: string;
   quantity: number;
-  unit: 'grams' | 'bowl' | 'plate' | 'piece' | 'roti' | 'cup' | 'glass' | 'tbsp' | 'tsp' | 'serving';
+  unit: string;
   grams: number;
   nutrition?: {
     calories: number;
@@ -19,34 +21,31 @@ export interface ILogFoodDTO {
     fiber: number;
   };
   source?: {
-    type: 'manual' | 'search' | 'snap' | 'recipe';
+    type: 'search' | 'barcode' | 'voice' | 'camera' | 'recipe' | 'manual' | 'snap_check' | 'snap';
+    rawInput?: string;
     referenceId?: string;
   };
   imageUrl?: string;
-  confidence?: {
-    foodConfidence?: number;
-    portionConfidence?: number;
-  };
+  confidence?: any;
 }
 
 export class FoodLogService {
   public static getTodayDateString(): string {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
+    const today = new Date();
+    return today.toISOString().split('T')[0];
   }
 
-  // Calculate nutrition from Food database or proportional scaling
   public static calculateNutrition(
-    baseNutritionPer100g: { calories: number; protein: number; carbs: number; fat: number; fiber?: number },
-    targetGrams: number
+    basePer100g: { calories: number; protein: number; carbs: number; fat: number; fiber?: number },
+    grams: number
   ) {
-    const factor = targetGrams / 100;
+    const factor = grams / 100;
     return {
-      calories: Math.round(baseNutritionPer100g.calories * factor),
-      protein: Math.round(baseNutritionPer100g.protein * factor * 10) / 10,
-      carbohydrates: Math.round(baseNutritionPer100g.carbs * factor * 10) / 10,
-      fat: Math.round(baseNutritionPer100g.fat * factor * 10) / 10,
-      fiber: Math.round((baseNutritionPer100g.fiber || 1) * factor * 10) / 10,
+      calories: Math.round(basePer100g.calories * factor),
+      protein: Math.round(basePer100g.protein * factor * 10) / 10,
+      carbohydrates: Math.round(basePer100g.carbs * factor * 10) / 10,
+      fat: Math.round(basePer100g.fat * factor * 10) / 10,
+      fiber: Math.round((basePer100g.fiber || 0) * factor * 10) / 10,
     };
   }
 
@@ -71,7 +70,6 @@ export class FoodLogService {
       }
     }
 
-
     if (!finalNutrition) {
       finalNutrition = { calories: 200, protein: 5, carbohydrates: 30, fat: 5, fiber: 2 };
     }
@@ -92,6 +90,37 @@ export class FoodLogService {
     });
 
     await foodLog.save();
+
+    // Also sync entry to MealLog model so HealthDashboard, Progress & Personalization pick it up
+    try {
+      let mappedMealType: 'breakfast' | 'mid_morning' | 'lunch' | 'evening_snack' | 'dinner' = 'lunch';
+      if (dto.mealType === 'breakfast') mappedMealType = 'breakfast';
+      else if (dto.mealType === 'snack') mappedMealType = 'evening_snack';
+      else if (dto.mealType === 'dinner') mappedMealType = 'dinner';
+      else if (dto.mealType === 'lunch') mappedMealType = 'lunch';
+      else mappedMealType = 'mid_morning';
+
+      const validFoodId = dto.foodId && mongoose.Types.ObjectId.isValid(dto.foodId)
+        ? new mongoose.Types.ObjectId(dto.foodId)
+        : new mongoose.Types.ObjectId();
+
+      const mealLog = new MealLog({
+        userId: new mongoose.Types.ObjectId(dto.userId),
+        foodId: validFoodId,
+        mealType: mappedMealType,
+        quantityG: dto.grams || 100,
+        calories: finalNutrition.calories || 0,
+        proteinG: finalNutrition.protein || 0,
+        carbsG: finalNutrition.carbohydrates || 0,
+        fatG: finalNutrition.fat || 0,
+        consumedAt: dto.date ? new Date(dto.date) : new Date(),
+        source: dto.source?.type === 'snap_check' ? 'snap_check' : 'manual',
+      });
+      await mealLog.save();
+    } catch (err) {
+      console.error('Error syncing to MealLog:', err);
+    }
+
     return foodLog;
   }
 

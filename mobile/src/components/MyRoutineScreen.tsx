@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Check, Plus, Sparkles, Clock, Flame, Dumbbell } from 'lucide-react';
+import { workoutApi } from '../services/api';
 
 interface Props {
   onStartWorkoutForDay: (dayName: string) => void;
@@ -11,15 +12,30 @@ export const MyRoutineScreen: React.FC<Props> = ({
   onCreatePersonalRoutine,
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>('mon');
+  const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    workoutApi.getRoutine()
+      .then((res) => {
+        if (isMounted && res.success && res.data?.completedDays) {
+          setCompletedMap(res.data.completedDays);
+        }
+      })
+      .catch(console.error);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const weekDays = [
-    { key: 'mon', name: 'Mon', dayNum: '1', completed: true },
-    { key: 'tue', name: 'Tue', dayNum: '2', completed: true },
-    { key: 'wed', name: 'Wed', dayNum: '3', completed: true },
-    { key: 'thu', name: 'Thu', dayNum: '4', completed: false, isToday: true },
-    { key: 'fri', name: 'Fri', dayNum: '5', completed: false },
-    { key: 'sat', name: 'Sat', dayNum: '6', completed: false },
-    { key: 'sun', name: 'Sun', dayNum: '7', completed: false },
+    { key: 'mon', dayKey: 'monday', name: 'Mon', dayNum: '1', completed: !!completedMap['monday'] },
+    { key: 'tue', dayKey: 'tuesday', name: 'Tue', dayNum: '2', completed: !!completedMap['tuesday'] },
+    { key: 'wed', dayKey: 'wednesday', name: 'Wed', dayNum: '3', completed: !!completedMap['wednesday'] },
+    { key: 'thu', dayKey: 'thursday', name: 'Thu', dayNum: '4', completed: !!completedMap['thursday'] },
+    { key: 'fri', dayKey: 'friday', name: 'Fri', dayNum: '5', completed: !!completedMap['friday'] },
+    { key: 'sat', dayKey: 'saturday', name: 'Sat', dayNum: '6', completed: !!completedMap['saturday'] },
+    { key: 'sun', dayKey: 'sunday', name: 'Sun', dayNum: '7', completed: !!completedMap['sunday'] },
   ];
 
   const weeklySchedule = [
@@ -29,7 +45,7 @@ export const MyRoutineScreen: React.FC<Props> = ({
       title: 'Lower Body Strength',
       duration: '32 min',
       calories: '210 kcal',
-      completed: true,
+      completed: !!completedMap['monday'],
       equipment: 'Dumbbells',
     },
     {
@@ -38,7 +54,7 @@ export const MyRoutineScreen: React.FC<Props> = ({
       title: 'Upper Body Push',
       duration: '28 min',
       calories: '180 kcal',
-      completed: true,
+      completed: !!completedMap['wednesday'],
       equipment: 'Barbell & Bench',
     },
     {
@@ -47,7 +63,7 @@ export const MyRoutineScreen: React.FC<Props> = ({
       title: 'HIIT Cardio',
       duration: '20 min',
       calories: '160 kcal',
-      completed: false,
+      completed: !!completedMap['friday'],
       equipment: 'Bodyweight',
     },
     {
@@ -56,7 +72,7 @@ export const MyRoutineScreen: React.FC<Props> = ({
       title: 'Full Body Mobility',
       duration: '15 min',
       calories: '90 kcal',
-      completed: false,
+      completed: !!completedMap['sunday'],
       equipment: 'Mat / Bands',
     },
   ];

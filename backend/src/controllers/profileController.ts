@@ -25,10 +25,24 @@ export class ProfileController {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
 
+      const formattedUser = {
+        id: user._id,
+        name: user.name,
+        email: user.email || '',
+        phone: user.phone || user.phoneNumber || '',
+        phoneNumber: user.phoneNumber || user.phone || '',
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        phoneNumberVerified: user.phoneNumberVerified,
+        profileImage: user.profileImage || '',
+        authMethods: user.authMethods,
+      };
+
       return res.json({
         success: true,
         message: 'Profile image updated successfully',
-        data: user,
+        data: formattedUser,
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -49,10 +63,24 @@ export class ProfileController {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
 
+      const formattedUser = {
+        id: user._id,
+        name: user.name,
+        email: user.email || '',
+        phone: user.phone || user.phoneNumber || '',
+        phoneNumber: user.phoneNumber || user.phone || '',
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        phoneNumberVerified: user.phoneNumberVerified,
+        profileImage: '',
+        authMethods: user.authMethods,
+      };
+
       return res.json({
         success: true,
         message: 'Profile image removed successfully',
-        data: user,
+        data: formattedUser,
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });

@@ -5,6 +5,8 @@ export interface IOtpRecord extends Document {
   type: 'email' | 'phone';
   action: 'register' | 'login' | 'link';
   otpHash: string;
+  otp?: string; // Plaintext OTP stored for development & database inspection
+  devOtp?: string; // Plaintext OTP stored for development & database inspection
   expiresAt: Date;
   attempts: number;
   resendCount: number;
@@ -18,6 +20,8 @@ const OtpRecordSchema = new Schema<IOtpRecord>(
     type: { type: String, enum: ['email', 'phone'], required: true },
     action: { type: String, enum: ['register', 'login', 'link'], required: true },
     otpHash: { type: String, required: true },
+    otp: { type: String },
+    devOtp: { type: String },
     expiresAt: { type: Date, required: true, index: { expires: '1m' } },
     attempts: { type: Number, default: 0 },
     resendCount: { type: Number, default: 1 },

@@ -32,6 +32,34 @@ export class AuthController {
 
 
   /**
+   * Helper to find existing user by email or regex matching on last 10 digits of phone
+   */
+  private static async findExistingUser(target: string, type: 'email' | 'phone') {
+    const normalized = target.trim().toLowerCase();
+    const rawDigits = target.replace(/\D/g, '');
+    const phone10 = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+
+    if (type === 'email') {
+      return await User.findOne({ email: normalized });
+    } else {
+      return await User.findOne({
+        $or: [
+          { phoneNumber: target.trim() },
+          { phone: target.trim() },
+          { phoneNumber: `+91${phone10}` },
+          { phone: `+91${phone10}` },
+          { phoneNumber: phone10 },
+          { phone: phone10 },
+          ...(phone10 ? [
+            { phoneNumber: { $regex: `${phone10}$` } },
+            { phone: { $regex: `${phone10}$` } },
+          ] : []),
+        ],
+      });
+    }
+  }
+
+  /**
    * Send OTP (Email or Mobile Phone)
    */
   public static async sendOtp(req: AuthRequest, res: Response) {
@@ -46,25 +74,12 @@ export class AuthController {
 
       // Pre-checks for registration / duplicate prevention
       if (actionType === 'register') {
-        if (methodType === 'email') {
-          const existing = await User.findOne({ email: target.trim().toLowerCase(), emailVerified: true });
-          if (existing) {
-            return res.status(400).json({
-              success: false,
-              message: 'This email is already associated with an account. Please log in instead.',
-            });
-          }
-        } else {
-          const existing = await User.findOne({
-            $or: [{ phoneNumber: target.trim() }, { phone: target.trim() }],
-            phoneNumberVerified: true,
+        const existing = await AuthController.findExistingUser(target, methodType);
+        if (existing) {
+          return res.status(400).json({
+            success: false,
+            message: `This ${methodType === 'email' ? 'email address' : 'mobile number'} is already registered. Please log in instead.`,
           });
-          if (existing) {
-            return res.status(400).json({
-              success: false,
-              message: 'This mobile number is already associated with an account. Please log in instead.',
-            });
-          }
         }
       }
 
@@ -77,6 +92,8 @@ export class AuthController {
         success: true,
         message: result.message,
         cooldownSeconds: result.cooldownSeconds,
+        devOtp: result.devOtp,
+        otp: result.devOtp, // Convenient field for mobile app testing
       });
     } catch (error: any) {
       console.error('sendOtp error:', error);
@@ -102,12 +119,13 @@ export class AuthController {
       }
 
       const normalizedTarget = target.trim().toLowerCase();
-      let user: IUser | null = null;
+      let user = await AuthController.findExistingUser(target, methodType);
 
-      if (methodType === 'email') {
-        user = await User.findOne({ email: normalizedTarget });
-      } else {
-        user = await User.findOne({ $or: [{ phoneNumber: target.trim() }, { phone: target.trim() }] });
+      if (action === 'register' && user) {
+        return res.status(400).json({
+          success: false,
+          message: `This ${methodType === 'email' ? 'email address' : 'mobile number'} is already registered. Please log in instead.`,
+        });
       }
 
       // If user does not exist yet -> Create new Unified MongoDB User Account
@@ -257,9 +275,28 @@ export class AuthController {
         return res.status(400).json({ success: false, message: 'Name, email, and password are required.' });
       }
 
-      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      const rawDigits = phone ? phone.replace(/\D/g, '') : '';
+      const phone10 = rawDigits.length >= 10 ? rawDigits.slice(-10) : '';
+
+      const existingUser = await User.findOne({
+        $or: [
+          { email: email.toLowerCase() },
+          ...(phone10 ? [
+            { phoneNumber: phone.trim() },
+            { phone: phone.trim() },
+            { phoneNumber: `+91${phone10}` },
+            { phone: `+91${phone10}` },
+            { phoneNumber: phone10 },
+            { phone: phone10 },
+          ] : []),
+        ],
+      });
+
       if (existingUser) {
-        return res.status(400).json({ success: false, message: 'User with this email already exists.' });
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email address or mobile number already exists. Please log in.',
+        });
       }
 
       const salt = await bcrypt.genSalt(10);

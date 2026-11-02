@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dumbbell, Sparkles, LayoutDashboard, Calendar, Search, Activity } from 'lucide-react';
-import { workoutApi } from '../services/api';
+import { authApi, workoutApi } from '../services/api';
 import { WorkoutDashboard } from '../components/WorkoutDashboard';
 import { MyRoutineScreen } from '../components/MyRoutineScreen';
 import { WorkoutLibraryScreen } from '../components/WorkoutLibraryScreen';
@@ -14,10 +14,12 @@ import { ExerciseDetailModal } from './ExerciseDetailModal';
 import { AIWorkoutQueryModal } from '../components/AIWorkoutQueryModal';
 
 interface Props {
+  user?: any;
+  profile?: any;
   onLogSuccess?: () => void;
 }
 
-export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
+export const WorkoutStudioScreen: React.FC<Props> = ({ user: propUser, profile, onLogSuccess }) => {
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'routine' | 'library' | 'activity'>('dashboard');
 
   // Selected Category / Workout Details View State
@@ -28,7 +30,17 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
   const [workoutPlan, setWorkoutPlan] = useState<any>(null);
   const [isCompletedToday, setIsCompletedToday] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(propUser || null);
+
+  useEffect(() => {
+    if (propUser) {
+      setCurrentUser(propUser);
+    } else {
+      authApi.getMe().then((res) => {
+        if (res.success && res.data) setCurrentUser(res.data);
+      }).catch(console.error);
+    }
+  }, [propUser]);
 
   // Modals state
   const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState<boolean>(false);
@@ -172,7 +184,7 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
           />
         ) : activeSubTab === 'dashboard' ? (
           <WorkoutDashboard
-            user={user}
+            user={currentUser}
             workoutPlan={workoutPlan}
             isCompletedToday={isCompletedToday}
             onStartWorkout={() => setIsLiveTrackerOpen(true)}
@@ -217,6 +229,7 @@ export const WorkoutStudioScreen: React.FC<Props> = ({ onLogSuccess }) => {
         isOpen={isLiveTrackerOpen}
         onClose={() => setIsLiveTrackerOpen(false)}
         workoutPlan={workoutPlan}
+        user={currentUser}
         onReplaceExercise={(index, exerciseId) => handleSingleExerciseReplace(index, exerciseId)}
         onWorkoutCompleted={() => {
           setIsCompletedToday(true);

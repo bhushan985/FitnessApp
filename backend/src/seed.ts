@@ -59,28 +59,37 @@ export const seedDatabase = async () => {
   const adminUser = await User.create({
     name: 'Fitness Admin',
     email: 'admin@fitnessapp.com',
+    phoneNumber: '+919999988888',
+    phone: '+919999988888',
     passwordHash,
     role: 'admin',
     status: 'active',
     emailVerified: true,
+    phoneNumberVerified: true,
   });
 
   const demoUser = await User.create({
     name: 'Rahul Sharma',
     email: 'rahul@example.com',
+    phoneNumber: '+919876543210',
+    phone: '+919876543210',
     passwordHash,
     role: 'user',
     status: 'active',
     emailVerified: true,
+    phoneNumberVerified: true,
   });
 
   const trainerUser = await User.create({
     name: 'Vikram Singh (Coach)',
     email: 'vikram@fitnessapp.com',
+    phoneNumber: '+919876543211',
+    phone: '+919876543211',
     passwordHash,
     role: 'trainer',
     status: 'active',
     emailVerified: true,
+    phoneNumberVerified: true,
   });
 
   console.log(`Seeded Users: Admin (${adminUser.email}), User (${demoUser.email}), Trainer (${trainerUser.email})`);
